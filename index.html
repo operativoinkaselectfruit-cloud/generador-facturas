@@ -97,6 +97,14 @@
   .badge { font-weight: 500; color: var(--muted); margin-left: 6px; }
   [hidden] { display: none !important; }
 
+  .addrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  button.ghost.sm { height: 38px; padding: 0 14px; font-size: 14px; }
+  .fila { border: 1px solid var(--line); border-radius: 8px; padding: 12px 12px 4px; margin: 0 0 12px; background: var(--surface); }
+  .fila-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 700; font-size: 14px; }
+  .link-btn { background: none; border: 0; color: var(--err); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 2px; }
+  .row3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+  .fila .sub { margin-left: 0; }
+
   /* Vista previa */
   .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .kpi { padding: 10px 12px; min-width: 0; }
@@ -125,7 +133,9 @@
   .p-obs { margin: 3px 0 12px; min-height: 17px; }
   .p-obs .v { font-weight: 700; color: #FF0000; }
   .p-tbl { background: #D9E1F2; display: grid; grid-template-columns: 95px 85px 205px 1fr; text-align: center; font-weight: 700; height: 13.5px; line-height: 13.5px; }
-  .p-item { display: grid; grid-template-columns: 95px 85px 205px 1fr; align-items: center; text-align: center; color: #0000FF; min-height: 34px; padding: 6px 0; margin-bottom: 12px; }
+  .p-item { display: grid; grid-template-columns: 95px 85px 205px 1fr; align-items: center; text-align: center; color: #0000FF; min-height: 34px; padding: 6px 0; }
+  .p-items { margin-bottom: 12px; }
+  .p-items .p-item + .p-item { border-top: 1px solid #C8C8C8; min-height: 28px; }
   .p-item .d { text-align: left; padding: 0 8px; }
   .p-sec { background: #1F4E79; color: #fff; font-weight: 700; font-size: 9px; height: 13.5px; line-height: 13.5px; padding-left: 3px; }
   .p-amt { display: grid; grid-template-columns: 218px 4px 20px 1fr; align-items: center; height: 11.7px; padding-right: 3px; }
@@ -235,6 +245,17 @@
         <div class="result" id="unitLine"></div>
       </fieldset>
 
+      <fieldset id="fsFilas">
+        <legend>Filas adicionales</legend>
+        <p class="hint" style="margin: 0 0 10px">Descarte y sobrepeso se valorizan con su propia cantidad y valor unitario, y solo figuran en el comprobante si los agregas. La fila libre suma al valor de la fruta.</p>
+        <div id="filas"></div>
+        <div class="addrow">
+          <button type="button" class="ghost sm" data-add="DESCARTE">+ Descarte</button>
+          <button type="button" class="ghost sm" data-add="SOBREPESO">+ Sobrepeso</button>
+          <button type="button" class="ghost sm" data-add="LIBRE">+ Fila libre</button>
+        </div>
+      </fieldset>
+
       <fieldset id="fsGuias">
         <legend>Guías de remisión</legend>
         <label class="field"><span>Guías (separadas por coma, espacio o salto de línea)</span>
@@ -265,8 +286,6 @@
         <summary>Ajustes opcionales<span class="badge" id="advBadge"></span></summary>
         <div class="row2">
           <label class="field"><span>Descuentos</span><input type="text" inputmode="decimal" data-k="descuentos" placeholder="0.00"></label>
-          <label class="field"><span>Descarte valorizado (suma)</span><input type="text" inputmode="decimal" data-k="descarte" placeholder="0.00"></label>
-          <label class="field"><span>Sobrepeso (suma)</span><input type="text" inputmode="decimal" data-k="sobrepeso" placeholder="0.00"></label>
           <label class="field"><span>Bono rendimiento (suma)</span><input type="text" inputmode="decimal" data-k="bono" placeholder="0.00"></label>
           <label class="field"><span>Gastos operativos (resta)</span><input type="text" inputmode="decimal" data-k="gastos" placeholder="0.00"></label>
           <label class="field"><span>ISC</span><input type="text" inputmode="decimal" data-k="isc" placeholder="0.00"></label>
@@ -823,10 +842,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   C.normalizarGuias = normalizarGuias;
 
   /* ---------- Textos ---------- */
-  function producto(i) {
-    if (i.fruta === 'PALTA') return i.modalidad === 'ADELANTO' ? 'PALTA ' + i.variedad : 'PALTA FRESCA VARIEDAD ' + i.variedad;
+  function producto(i, estandar) {
+    if (i.fruta === 'PALTA') return (i.modalidad === 'ADELANTO' && !estandar) ? 'PALTA ' + i.variedad : 'PALTA FRESCA VARIEDAD ' + i.variedad;
     return 'UVA FRESCA VARIEDAD ' + i.variedad;
   }
+  C.TIPOS_FILA = { DESCARTE: 'Descarte', SOBREPESO: 'Sobrepeso', LIBRE: 'Fila libre' };
+  // valor unitario de una fila adicional: cada fila tiene su propia lógica de descuentos
+  function unidadFila(r) {
+    var u = numOr0(r.vu);
+    if (r.deshid) u = u * 0.99;
+    if (r.otroDesc) { var v = numOr0(r.otroValor); u = r.otroTipo === 'kg' ? u - v : u * (1 - v / 100); }
+    return u;
+  }
+  C.unidadFila = unidadFila;
   function descripcion(i) {
     var p = producto(i);
     switch (i.modalidad) {
@@ -870,6 +898,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     } else if (i.modalidad === 'ADELANTO') {
       if (!(imp > 0)) f.push('importe total');
     }
+    (i.filas || []).forEach(function (r, k) {
+      var miss = [];
+      if (r.tipo === 'LIBRE' && !String(r.desc || '').trim()) miss.push('descripci\u00f3n');
+      if (!(parseNum(r.cant) > 0)) miss.push('cantidad');
+      if (!(parseNum(r.vu) > 0)) miss.push('valor unitario');
+      else if (!(unidadFila(r) > 0)) miss.push('descuento v\u00e1lido');
+      if (r.otroDesc && !(parseNum(r.otroValor) > 0)) miss.push('valor del descuento');
+      if (miss.length) f.push('fila ' + (k + 1) + ' (' + (C.TIPOS_FILA[r.tipo] || 'fila').toLowerCase() + '): ' + miss.join(', '));
+    });
     if (i.modalidad !== 'ADELANTO') {
       var hayNumeros = String(i.guias || '').split(/[\s,;]+/).some(function (t) { return /^\d{1,7}$/.test(t); });
       if (hayNumeros && !/^[A-Z][A-Z0-9]{3}$/.test(limpiarSerie(i.serie))) f.push('serie de las gu\u00edas (4 caracteres, ej. T002)');
@@ -901,15 +938,27 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       }
     }
 
+    var filas = (i.filas || []).map(function (r) {
+      var q = numOr0(r.cant), u = unidadFila(r);
+      return {
+        tipo: r.tipo, unidad: r.unidad === 'UNIDAD' ? 'UNIDAD' : 'KILOGRAMO', qty: q, unit: u, valor: round2(q * u),
+        desc: r.tipo === 'LIBRE' ? String(r.desc || '').trim().toLocaleUpperCase('es-PE')
+          : producto(i, true) + ' ' + (r.tipo === 'DESCARTE' ? 'DESCARTE' : 'SOBREPESO')
+      };
+    });
+    function suma(t) {
+      return round2(filas.filter(function (x) { return x.tipo === t; }).reduce(function (a, x) { return a + x.valor; }, 0));
+    }
+    var libres = suma('LIBRE');
     var adj = {
-      descarte: numOr0(i.descarte), sobrepeso: numOr0(i.sobrepeso), bono: numOr0(i.bono),
+      descarte: suma('DESCARTE'), sobrepeso: suma('SOBREPESO'), bono: numOr0(i.bono),
       gastos: numOr0(i.gastos), anticipos: numOr0(i.anticipos), descuentos: numOr0(i.descuentos),
       isc: numOr0(i.isc), otrosCargos: numOr0(i.otrosCargos), otrosTributos: numOr0(i.otrosTributos),
       redondeo: numOr0(i.redondeo)
     };
-    var sinAjustes = Object.keys(adj).every(function (k) { return adj[k] === 0; });
+    var sinAjustes = filas.length === 0 && Object.keys(adj).every(function (k) { return adj[k] === 0; });
 
-    var bruto = round2(qty * unit);
+    var bruto = round2(round2(qty * unit) + libres);
     var neto = round2(bruto + adj.descarte + adj.sobrepeso + adj.bono - adj.gastos);
     var valorVenta = round2(neto - adj.anticipos - adj.descuentos);
     var igv = round2(valorVenta * tasaIGV);
@@ -921,7 +970,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return {
       afecto: afecto, tasaIGV: tasaIGV, tasaDet: tasaDet, qty: qty, unit: unit, unidad: unidad,
       adj: adj, bruto: bruto, neto: neto, valorVenta: valorVenta, igv: igv, total: total,
-      detraccion: detraccion, porAbonar: porAbonar
+      detraccion: detraccion, porAbonar: porAbonar, filas: filas
     };
   }
   C.calcular = calcular;
@@ -934,14 +983,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       o = o || {};
       return { k: 'amt', label: label, sym: sym, v: fmt2(v), color: o.color || 'blue', bold: !!o.bold, band: o.band || null };
     }
-    var calc = [
-      amt('Valor Fruta Bruto', c.bruto),
-      amt('(+) Descarte', c.adj.descarte),
-      amt('(+) Sobrepeso', c.adj.sobrepeso),
-      amt('(+) Bono rendimiento', c.adj.bono),
-      amt('(-) Gastos Operativos', c.adj.gastos),
-      amt('Sub Total Ventas (Valor Fruta Neto)', c.neto, { color: 'black', bold: true, band: 'blue' })
-    ];
+    // Descarte, sobrepeso y bono solo figuran cuando se valorizan
+    var calc = [amt('Valor Fruta Bruto', c.bruto)];
+    if (c.adj.descarte) calc.push(amt('(+) Descarte', c.adj.descarte));
+    if (c.adj.sobrepeso) calc.push(amt('(+) Sobrepeso', c.adj.sobrepeso));
+    if (c.adj.bono) calc.push(amt('(+) Bono rendimiento', c.adj.bono));
+    calc.push(amt('(-) Gastos Operativos', c.adj.gastos));
+    calc.push(amt('Sub Total Ventas (Valor Fruta Neto)', c.neto, { color: 'black', bold: true, band: 'blue' }));
     var resumen = [
       amt('Anticipos', c.adj.anticipos),
       amt('Descuentos', c.adj.descuentos),
@@ -986,6 +1034,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         cant: fmt2(c.qty), unidad: c.unidad, desc: descripcion(i),
         vu: isFinite(c.unit) ? fmtUnit(c.unit) : ''
       },
+      extraItems: c.filas.map(function (x) {
+        return { cant: fmt2(x.qty), unidad: x.unidad, desc: x.desc, vu: isFinite(x.unit) ? fmtUnit(x.unit) : '' };
+      }),
       calcTitle: 'DATOS DE C\u00c1LCULO', calcRows: calc,
       resumenTitle: 'RESUMEN DE VENTA', resumenRows: resumen,
       son: 'SON: ' + montoEnLetras(c.total, i.moneda),
@@ -998,7 +1049,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   /* ---------- Render PDF (jsPDF, A4 vertical, vectorial) ---------- */
   function drawPDF(JsPDF, m) {
     var doc = new JsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
-    var W = 595.28, L = 48, R = W - 48, CW = R - L;
+    var W = 595.28, H = 841.89, L = 48, R = W - 48, CW = R - L;
     var NAVY = [31, 78, 121], LBLUE = [217, 225, 242], LYEL = [255, 242, 204];
     var BLUE = [0, 0, 255], RED = [255, 0, 0], BLACK = [0, 0, 0], WHITE = [255, 255, 255], GRAY = [242, 242, 242];
     var FS = 8.5;
@@ -1058,20 +1109,27 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       T(h, cols[k].x + cols[k].w / 2, y + 6.75, { bold: true, align: 'center' });
     });
     y += 13.5;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(FS);
-    var dLines = doc.splitTextToSize(m.item.desc, cols[2].w - 16);
-    var itemH = Math.max(34, dLines.length * 10.6 + 18);
-    var icy = y + itemH / 2;
-    T(m.item.cant, cols[0].x + cols[0].w / 2, icy, { color: BLUE, align: 'center' });
-    T(m.item.unidad, cols[1].x + cols[1].w / 2, icy, { color: BLUE, align: 'center' });
-    dLines.forEach(function (ln, k) {
-      T(ln, cols[2].x + 8, icy + (k - (dLines.length - 1) / 2) * 10.6, { color: BLUE });
+    [m.item].concat(m.extraItems || []).forEach(function (it, idx) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(FS);
+      var dLines = doc.splitTextToSize(it.desc || '', cols[2].w - 16);
+      var itemH = Math.max(idx === 0 ? 34 : 28, dLines.length * 10.6 + (idx === 0 ? 18 : 14));
+      if (y + itemH > H - 48) { doc.addPage(); y = 48; }
+      if (idx > 0) { doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.4); doc.line(L, y, R, y); }
+      var icy = y + itemH / 2;
+      T(it.cant, cols[0].x + cols[0].w / 2, icy, { color: BLUE, align: 'center' });
+      T(it.unidad, cols[1].x + cols[1].w / 2, icy, { color: BLUE, align: 'center' });
+      dLines.forEach(function (ln, k) {
+        T(ln, cols[2].x + 8, icy + (k - (dLines.length - 1) / 2) * 10.6, { color: BLUE });
+      });
+      T(it.vu, cols[3].x + cols[3].w / 2, icy, { color: BLUE, align: 'center' });
+      y += itemH;
     });
-    T(m.item.vu, cols[3].x + cols[3].w / 2, icy, { color: BLUE, align: 'center' });
-    y += itemH + 12;
+    y += 12;
 
     // Secciones
     var sh = 13.5, rh2 = 11.7, xr = L + 218, xs = L + 222;
+    function secH(n) { return sh + n * rh2; }
+    function ensure(h) { if (y + h > H - 36) { doc.addPage(); y = 48; } }  // cada bloque se mantiene entero en una página
     function band(title) {
       fill(L, y, CW, sh, NAVY);
       T(title, L + 3, y + sh / 2, { bold: true, size: 9, color: WHITE });
@@ -1098,8 +1156,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         y += rh2;
       });
     }
+    ensure(secH(m.calcRows.length));
     band(m.calcTitle); rows(m.calcRows); y += 11;
+    ensure(secH(m.resumenRows.length));
     band(m.resumenTitle); rows(m.resumenRows); y += 9;
+    ensure(24 + secH(m.detRows.length));
     T('SON:', L + 4, y + 8, { bold: true });
     T(m.son.replace(/^SON:\s*/, ''), L + 56, y + 8, { bold: true, color: BLUE });
     y += 24;
@@ -1107,6 +1168,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     // Pie
     doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.6);
+    if (y + 34 > H - 12) { doc.addPage(); y = 48; }  // el pie puede ocupar el margen inferior
     doc.rect(L, y, CW, 34, 'S');
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
     var fl = doc.splitTextToSize(m.footer, CW - 24);
@@ -1140,9 +1202,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return {
     productor: '', modalidad: 'CAMPO', fruta: 'UVA', variedad: '', unidad: 'KILOGRAMO',
     kg: '', precio: '', deshid: false, otroDesc: false, otroValor: '', otroTipo: 'pct',
-    importe: '', anioComp: year + 1, guias: '', serie: FT.SERIE_GRE, anticipoRef: '',
+    importe: '', anioComp: year + 1, guias: '', serie: FT.SERIE_GRE, anticipoRef: '', filas: [],
     moneda: 'SOL PERUANO', regimen: FT.REG_AFECTO, formaPago: 'Contado', fecha: hoy(),
-    anticipos: '', descarte: '', sobrepeso: '', bono: '', gastos: '', descuentos: '',
+    anticipos: '', bono: '', gastos: '', descuentos: '',
     isc: '', otrosCargos: '', otrosTributos: '', redondeo: '',
     bienServicio: FT.BIEN_SERVICIO_DEFAULT, medioPago: '', cuenta: ''
     };
@@ -1203,6 +1265,74 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   $('panel').addEventListener('input', onInput);
   $('panel').addEventListener('change', onInput);
 
+  /* Filas adicionales (descarte, sobrepeso y fila libre) */
+  var nextFilaId = 1;
+  function newFila(tipo) {
+    return { id: nextFilaId++, tipo: tipo, desc: '', unidad: 'KILOGRAMO', cant: '', vu: '',
+      deshid: false, otroDesc: false, otroValor: '', otroTipo: 'pct' };
+  }
+  function fieldOf(text, control) { var l = el('label', 'field'); l.append(el('span', null, text), control); return l; }
+  function inputOf(rk, val, ph, mode) {
+    var i = el('input'); i.type = 'text'; i.dataset.rk = rk; i.value = val; i.autocomplete = 'off';
+    if (ph) i.placeholder = ph; if (mode) i.setAttribute('inputmode', mode); return i;
+  }
+  function selectOf(rk, opts, val) {
+    var s = el('select'); s.dataset.rk = rk;
+    opts.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; s.append(op); });
+    s.value = val; return s;
+  }
+  function checkOf(rk, text, on) {
+    var l = el('label', 'chk'), i = el('input'); i.type = 'checkbox'; i.dataset.rk = rk; i.checked = on;
+    l.append(i, el('span', null, text)); return l;
+  }
+  function buildFila(r, idx) {
+    var card = el('div', 'fila'); card.dataset.id = r.id;
+    var hd = el('div', 'fila-hd'); hd.append(el('span', null, (idx + 1) + '. ' + FT.TIPOS_FILA[r.tipo]));
+    var del = el('button', 'link-btn', 'Quitar'); del.type = 'button'; del.dataset.del = r.id; hd.append(del);
+    card.append(hd);
+    if (r.tipo === 'LIBRE') card.append(fieldOf('Descripción', inputOf('desc', r.desc, 'Ej.: servicio de selección')));
+    else { var dd = el('p', 'hint'); dd.dataset.descr = '1'; dd.style.margin = '0 0 10px'; card.append(dd); }
+    var g = el('div', 'row3');
+    g.append(fieldOf('Unidad de medida', selectOf('unidad', [['KILOGRAMO', 'KILOGRAMO'], ['UNIDAD', 'UNIDAD']], r.unidad)),
+      fieldOf('Cantidad', inputOf('cant', r.cant, '0.00', 'decimal')),
+      fieldOf('Valor unitario (sin IGV)', inputOf('vu', r.vu, '0.00', 'decimal')));
+    card.append(g);
+    card.append(checkOf('deshid', 'Deshidratación (resta 1% al valor unitario)', r.deshid));
+    card.append(checkOf('otroDesc', 'Otro descuento sobre el valor unitario', r.otroDesc));
+    var box = el('div', 'sub row2'); box.dataset.otro = '1';
+    box.append(fieldOf('Valor del descuento', inputOf('otroValor', r.otroValor, '0.00', 'decimal')),
+      fieldOf('Se aplica como', selectOf('otroTipo', [['pct', 'Porcentaje (%)'], ['kg', 'Monto por unidad de medida']], r.otroTipo)));
+    card.append(box);
+    var res = el('div', 'result'); res.dataset.res = '1'; card.append(res);
+    return card;
+  }
+  function renderFilas() {
+    var host = $('filas'); host.textContent = '';
+    state.filas.forEach(function (r, idx) { host.append(buildFila(r, idx)); });
+  }
+  $('fsFilas').addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.add) {
+      state.filas.push(newFila(t.dataset.add)); renderFilas(); render();
+      var card = $('filas').lastChild, first = card && card.querySelector('input[type="text"]');
+      if (first) first.focus();
+    } else if (t.dataset && t.dataset.del) {
+      state.filas = state.filas.filter(function (r) { return String(r.id) !== t.dataset.del; });
+      renderFilas(); render();
+    }
+  });
+  function onFilaInput(e) {
+    var t = e.target, rk = t.dataset && t.dataset.rk;
+    if (!rk) return;
+    var card = t.closest('.fila'); if (!card) return;
+    var r = state.filas.filter(function (x) { return String(x.id) === card.dataset.id; })[0];
+    if (!r) return;
+    r[rk] = t.type === 'checkbox' ? t.checked : t.value;
+    render();
+  }
+  $('filas').addEventListener('input', onFilaInput);
+  $('filas').addEventListener('change', onFilaInput);
+
   /* Render de la vista previa (misma información que el PDF) */
   function row(cls) { return el('div', cls); }
   function renderPaper(m) {
@@ -1232,9 +1362,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     p.append(ob);
 
     var th = row('p-tbl'); ['Cantidad', 'Unidad Medida', 'Descripción', 'Valor Unitario'].forEach(function (h) { th.append(el('div', null, h)); });
-    var it = row('p-item');
-    it.append(el('div', null, m.item.cant), el('div', null, m.item.unidad), el('div', 'd', m.item.desc), el('div', null, m.item.vu));
-    p.append(th, it);
+    var its = row('p-items');
+    [m.item].concat(m.extraItems || []).forEach(function (x) {
+      var it = row('p-item');
+      it.append(el('div', null, x.cant), el('div', null, x.unidad), el('div', 'd', x.desc), el('div', null, x.vu));
+      its.append(it);
+    });
+    p.append(th, its);
 
     function section(title, rows) {
       p.append(el('div', 'p-sec', title));
@@ -1300,10 +1434,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     var serieOk = FT.limpiarSerie(state.serie);
     $('hintGuias').textContent = 'Basta el correlativo: 378 se completa como ' + (serieOk || 'T002') + '-378. Si escribes la guía completa (ej. V001-25), se respeta tal cual.';
+    if (state.filas.length && (mod === 'PAGO PARCIAL' || mod === 'ADELANTO')) {
+      ul.append(document.createTextNode(' · Total del comprobante con filas adicionales: ' + sym + ' ' + FT.fmt2(c.total)));
+    }
+    var cards = $('filas').children;
+    c.filas.forEach(function (x, idx) {
+      var card = cards[idx], r = state.filas[idx];
+      if (!card || !r) return;
+      card.querySelector('[data-otro]').hidden = !r.otroDesc;
+      card.querySelector('[data-res]').textContent = 'Valor de la fila: ' + sym + ' ' + FT.fmt2(x.valor) + ' · valor unitario aplicado ' + FT.fmtUnit(x.unit);
+      var dd = card.querySelector('[data-descr]'); if (dd) dd.textContent = 'Descripción en el comprobante: ' + x.desc;
+    });
     var chips = $('chips'); chips.textContent = '';
     FT.normalizarGuias(state.guias, state.serie).forEach(function (g) { chips.append(el('span', 'chip', g)); });
 
-    var n = ['descuentos', 'descarte', 'sobrepeso', 'bono', 'gastos', 'isc', 'otrosCargos', 'otrosTributos', 'redondeo']
+    var n = ['descuentos', 'bono', 'gastos', 'isc', 'otrosCargos', 'otrosTributos', 'redondeo']
       .filter(function (k) { return FT.parseNum(state[k]) > 0; }).length;
     $('advBadge').textContent = n ? '(' + n + ' con valor)' : '';
 
@@ -1363,6 +1508,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       if (t.type === 'checkbox') t.checked = !!state[k]; else t.value = String(state[k]);
     });
     document.querySelectorAll('input[data-seg]').forEach(function (r) { r.checked = state[r.dataset.seg] === r.value; });
+    renderFilas();
   }
   var armed = false, armTimer = null;
   function disarm() { armed = false; clearTimeout(armTimer); $('clear').textContent = 'Borrar datos'; $('clear').classList.remove('armed'); }
